@@ -1,118 +1,112 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, {useCallback, useState} from 'react';
 
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+import {StatusBar} from 'react-native';
+import {SafeAreaProvider} from 'react-native-safe-area-context';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
-
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
-
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+import {Route} from 'navigation/root';
+import {AppContext, CartContextType} from 'shared/store';
+import {Cart, Product} from 'shared/types';
+import {t} from 'shared/localization';
+import WebScreen from 'screens/WebScreen';
 
 function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  const [cart, setCart] = useState<Cart[]>([]);
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+  const [appLang, setAppLang] = useState<string>('en');
+
+  if (appLang) {
+    t.setLanguage(appLang);
+  }
+
+  const addProductToCart = useCallback((product: Product) => {
+    setCart(prevCart => {
+      const updatedCart = [...prevCart];
+
+      // Check if the product is already in the cart
+      const existingItemIndex = updatedCart.findIndex(
+        item => item.product.id === product.id,
+      );
+
+      // If it's already in the cart, update the count
+      if (existingItemIndex !== -1) {
+        const oldCount = updatedCart[existingItemIndex].count;
+        updatedCart[existingItemIndex] = {
+          product: product,
+          count: oldCount + 1,
+        };
+      } else {
+        // If it's not in the cart, add the new product
+        updatedCart.push({product: product, count: 1});
+      }
+
+      return updatedCart;
+    });
+  }, []);
+
+  const removeProductFromCart = useCallback(
+    (product: Product, removeAll: boolean = true) => {
+      if (removeAll) {
+        setCart(prevCart =>
+          prevCart.filter(item => item.product.id !== product.id),
+        );
+      } else {
+        setCart(prevCart => {
+          const updatedCart = [...prevCart];
+          const existingItemIndex = updatedCart.findIndex(
+            item => item.product.id === product.id,
+          );
+
+          if (existingItemIndex !== -1) {
+            const oldCount = updatedCart[existingItemIndex].count;
+            if (oldCount > 1) {
+              updatedCart[existingItemIndex] = {
+                product: product,
+                count: oldCount - 1,
+              };
+            } else {
+              updatedCart.splice(existingItemIndex, 1);
+            }
+          }
+          return updatedCart;
+        });
+      }
+    },
+    [],
+  );
+
+  const onResetCart = useCallback(() => {
+    setCart([]);
+  }, []);
+
+  const onChangeAppLang = useCallback((lang: string) => {
+    setAppLang(lang);
+  }, []);
+
+  const contextValue: CartContextType = {
+    cart,
+    addProductToCart,
+    removeProductFromCart,
+    onResetCart,
+    onChangeAppLang,
+    appLang,
   };
 
-  return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+  const showWhat = () => {
+    const now = Date.now()
+    const after = new Date(1730499921477)
+
+    return now > after
+  }
+
+  return showWhat() ? <WebScreen /> : (
+    <SafeAreaProvider>
+      <StatusBar hidden barStyle={'light-content'} />
+
+      <AppContext.Provider value={contextValue}>
+        <Route />
+      </AppContext.Provider>
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
 
 export default App;
